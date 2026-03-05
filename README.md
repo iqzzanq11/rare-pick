@@ -76,6 +76,13 @@ npm run collect:prices
 npm run worker:watch
 ```
 
+브라우저 크롤링(Playwright) 사용 시 1회 설치:
+
+```bash
+npm install
+npx playwright install chromium
+```
+
 크론 예시(5분 간격):
 
 ```bash
@@ -109,6 +116,10 @@ cp .env.example .env
 - 프론트는 기본적으로 같은 도메인의 `/api/*`를 호출합니다.
 - 외부 API를 쓰고 싶으면 `NEXT_PUBLIC_API_BASE_URL`(또는 기존 호환 변수)로 오버라이드할 수 있습니다.
 - `NOTIFY_WEBHOOK_URL` 설정 시 조건 충족 알림을 웹훅으로 발송합니다.
+- `PRICE_FETCH_MODE`:
+  - `browser-first`(기본): Playwright 우선, 실패 시 HTTP fallback
+  - `browser-only`: Playwright만 사용
+  - `http-only`: 브라우저 없이 HTTP만 사용
 - `PRICE_FETCH_TIMEOUT_MS`로 상품 페이지 요청 타임아웃(ms)을 조정할 수 있습니다.
 
 ## DB 스키마 적용

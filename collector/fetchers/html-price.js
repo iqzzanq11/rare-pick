@@ -1,4 +1,5 @@
 const DEFAULT_TIMEOUT_MS = Number(process.env.PRICE_FETCH_TIMEOUT_MS || 15000)
+const FETCH_MODE = (process.env.PRICE_FETCH_MODE || 'browser-first').toLowerCase()
 
 function normalizeNumber(raw) {
   if (typeof raw !== 'string') {
@@ -90,7 +91,7 @@ export function extractByRegexList(html, regexList) {
   return null
 }
 
-export async function fetchHtml(url, { language = 'en-US,en;q=0.9', timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+async function fetchHtmlWithHttp(url, { language, timeoutMs }) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
@@ -117,5 +118,58 @@ export async function fetchHtml(url, { language = 'en-US,en;q=0.9', timeoutMs = 
     return response.text()
   } finally {
     clearTimeout(timeout)
+  }
+}
+
+async function fetchHtmlWithBrowser(url, { language, timeoutMs }) {
+  let playwright
+  try {
+    playwright = await import('playwright')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(`playwright not available: ${message}`)
+  }
+
+  const browser = await playwright.chromium.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  })
+
+  try {
+    const context = await browser.newContext({
+      locale: language.split(',')[0] || 'en-US',
+      userAgent:
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
+      viewport: { width: 1280, height: 2000 },
+    })
+    const page = await context.newPage()
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs })
+    await page.waitForTimeout(1500)
+    return page.content()
+  } finally {
+    await browser.close()
+  }
+}
+
+export async function fetchHtml(url, { language = 'en-US,en;q=0.9', timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+  const mode = FETCH_MODE
+
+  if (mode === 'http-only') {
+    return fetchHtmlWithHttp(url, { language, timeoutMs })
+  }
+  if (mode === 'browser-only') {
+    return fetchHtmlWithBrowser(url, { language, timeoutMs })
+  }
+
+  try {
+    return await fetchHtmlWithBrowser(url, { language, timeoutMs })
+  } catch (browserError) {
+    try {
+      return await fetchHtmlWithHttp(url, { language, timeoutMs })
+    } catch (httpError) {
+      const browserMessage = browserError instanceof Error ? browserError.message : String(browserError)
+      const httpMessage = httpError instanceof Error ? httpError.message : String(httpError)
+      throw new Error(`browser+http failed: browser=${browserMessage}; http=${httpMessage}`)
+    }
   }
 }
