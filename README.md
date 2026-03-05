@@ -7,9 +7,9 @@
 - Next.js(App Router) 대시보드: URL 등록 + 감시 목록 조회
 - DB 스키마: `products`, `price_history`, `click_events`, `affiliate_reports`
 - URL 감시 스키마: `watch_jobs`, `notifications`
-- 정적 배포 모드:
-  - 등록 데이터는 브라우저 `localStorage`에 저장
-  - 서버 API 라우트는 `legacy-api/app-api`로 분리 보관
+- 단일 Web Service 배포 모드:
+  - Next 앱과 API(`/api/*`)를 같은 서비스에서 운영
+  - DB 미연결/백엔드 오류 시 등록 데이터는 브라우저 `localStorage` fallback
 - 수집 배치 스크립트:
   - 가격 스냅샷 수집
   - PostgreSQL 직접 적재(`DATABASE_URL` 있을 때)
@@ -29,20 +29,38 @@ npm run dev
 
 브라우저: `http://localhost:3000`
 
-## Cloudflare Pages 배포
+## Render 배포 (단일 Web Service)
 
-이 저장소는 `next.config.mjs`에서 `output: 'export'`를 사용하므로 정적 파일(`out`)로 배포됩니다.
+`render.yaml` 기준으로 Next 페이지 + API를 하나의 Web Service로 배포합니다.
 
-1. 대시보드에서 이 저장소를 **Pages** 프로젝트로 연결
-2. Build command: `npm run build`
-3. Build output directory: `out`
-4. Node.js 버전은 20 이상 권장
+1. Render Blueprint로 `render.yaml` 배포
+2. Web Service(`rare-pick`) 설정:
+   - Build command: `npm ci && npm run build`
+   - Start command: `npm run start`
+3. 환경변수:
+   - `DATABASE_URL` (권장)
+4. 헬스체크:
+   - `GET /api/health`
+
+## API 경로 (Next Route Handler)
+
+API 서버는 Next 앱 내부 라우트로 동작합니다.
+
+API 파일:
+- `app/api/click/route.js`
+- `app/api/watch/route.js`
+- `app/api/health/route.js`
+
+프론트 호출 경로:
+- `components/product-dashboard.js` -> `POST /api/click` (클릭 로그)
+- `components/watch-dashboard.js` -> `POST /api/watch` (등록 데이터 저장)
 
 ## 동작 흐름
 
-1. 사용자 상품 URL 등록 (브라우저 내 처리)
-2. 등록 목록을 `localStorage`에 저장
-3. 페이지 재방문 시 로컬 저장 목록 조회
+1. 사용자 상품 URL 등록
+2. 기본적으로 `POST /api/watch`로 DB 저장 시도
+3. DB 미연결/서버 오류 시 `localStorage` fallback
+4. 페이지 재방문 시 로컬 저장 목록 조회
 
 ## 가격 수집 배치 실행
 
@@ -84,6 +102,9 @@ cp .env.example .env
 ```
 
 - `DATABASE_URL`이 없으면 앱/수집기 모두 mock/fallback 모드로 동작합니다.
+- `ALLOWED_ORIGINS`는 쉼표(,)로 여러 도메인 허용 가능
+- 프론트는 기본적으로 같은 도메인의 `/api/*`를 호출합니다.
+- 외부 API를 쓰고 싶으면 `NEXT_PUBLIC_API_BASE_URL`(또는 기존 호환 변수)로 오버라이드할 수 있습니다.
 - 아마존/쿠팡 API 키가 없으면 수집기는 mock 가격으로 동작합니다.
 - 쿠팡 API 경로가 계정/권한에 따라 다르면 `COUPANG_OPENAPI_PATH_TEMPLATE`를 수정하세요.
 - `NOTIFY_WEBHOOK_URL` 설정 시 조건 충족 알림을 웹훅으로 발송합니다.

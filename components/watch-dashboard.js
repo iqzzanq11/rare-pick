@@ -4,6 +4,17 @@ import { useEffect, useState } from 'react'
 import { parseProductUrl } from '../lib/url-parser'
 
 const STORAGE_KEY = 'rare-pick-watches-v1'
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') ||
+  process.env.NEXT_PUBLIC_WORKER_API_BASE_URL?.replace(/\/$/, '') ||
+  process.env.NEXT_PUBLIC_CLICK_API_BASE_URL?.replace(/\/$/, '')
+
+function getWatchEndpoint() {
+  if (API_BASE_URL) {
+    return `${API_BASE_URL}/watch`
+  }
+  return '/api/watch'
+}
 
 function formatMoney(value) {
   if (value === null || value === undefined) {
@@ -39,6 +50,30 @@ export default function WatchDashboard({ initialWatches, dbError }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(watches))
   }, [watches])
 
+  async function submitWatchToWorker(payload) {
+    const endpoint = getWatchEndpoint()
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        if (response.status >= 500) {
+          return null
+        }
+        const errorBody = await response.json().catch(() => ({}))
+        throw new Error(errorBody?.error || 'watch 등록 API 호출에 실패했습니다.')
+      }
+
+      const data = await response.json().catch(() => ({}))
+      return data?.watch ?? null
+    } catch {
+      return null
+    }
+  }
+
   async function onSubmit(event) {
     event.preventDefault()
     setError('')
@@ -71,7 +106,37 @@ export default function WatchDashboard({ initialWatches, dbError }) {
         lastError: null,
         createdAt: nowIso,
       }
-      setWatches((prev) => [watch, ...prev])
+      const inserted = await submitWatchToWorker({
+        source: parsed.source,
+        externalId: parsed.externalId,
+        productUrl: parsed.canonicalUrl,
+        targetPrice: normalizedTargetPrice,
+        notifyEmail: notifyEmail || null,
+      })
+
+      if (inserted) {
+        setWatches((prev) => [
+          {
+            id: String(inserted.id),
+            source: inserted.source,
+            externalId: inserted.externalId,
+            title: `[${inserted.source}] ${inserted.externalId}`,
+            productUrl: inserted.productUrl,
+            targetPrice: inserted.targetPrice,
+            notifyEmail: inserted.notifyEmail,
+            isActive: inserted.isActive,
+            lastCheckedAt: inserted.lastCheckedAt,
+            lastPrice: inserted.lastPrice,
+            lowestPrice: 0,
+            lastError: inserted.lastError,
+            createdAt: inserted.createdAt,
+          },
+          ...prev,
+        ])
+      } else {
+        setWatches((prev) => [watch, ...prev])
+      }
+
       setProductUrl('')
       setTargetPrice('')
       setNotifyEmail('')
@@ -87,7 +152,10 @@ export default function WatchDashboard({ initialWatches, dbError }) {
       <header className="hero">
         <p className="eyebrow">Rare Pick Watcher</p>
         <h1>상품 URL 입력 기반 최저가 알림 시스템</h1>
-        <p>Pages 정적 배포 모드에서는 브라우저 로컬 저장소에 등록 목록이 저장됩니다.</p>
+        <p>
+          API가 연결되면 등록 데이터는 DB에 저장되고, 미연결 상태에서는 브라우저 로컬 저장소에
+          저장됩니다.
+        </p>
         {dbError ? <p className="error">DB 연결 오류: {dbError}</p> : null}
       </header>
 
