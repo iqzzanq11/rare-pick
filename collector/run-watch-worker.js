@@ -1,0 +1,101 @@
+import { fetchAmazonPrice } from './fetchers/amazon-paapi.js'
+import { fetchCoupangPrice } from './fetchers/coupang-openapi.js'
+import {
+  createNotificationEvent,
+  listActiveWatchJobs,
+  markWatchError,
+  saveSnapshotForWatch,
+} from './repository.js'
+import { notifyPriceHit } from './notifier.js'
+
+function toFetchItem(watch) {
+  return {
+    source: watch.source,
+    externalId: watch.externalId,
+    title: `[${watch.source}] ${watch.externalId}`,
+    affiliateUrl: watch.productUrl,
+  }
+}
+
+async function fetchCurrentPrice(watch) {
+  const item = toFetchItem(watch)
+  if (watch.source === 'amazon') {
+    return fetchAmazonPrice(item)
+  }
+  if (watch.source === 'coupang') {
+    return fetchCoupangPrice(item)
+  }
+  throw new Error(`unsupported source: ${watch.source}`)
+}
+
+function evaluateHit({ watch, previousMinPrice, latestPrice }) {
+  const isNewLowest = previousMinPrice === null || latestPrice < previousMinPrice
+  const isTargetHit = watch.targetPrice !== null && latestPrice <= watch.targetPrice
+
+  if (isTargetHit) {
+    return { hit: true, reason: 'target_price' }
+  }
+  if (isNewLowest) {
+    return { hit: true, reason: 'new_lowest' }
+  }
+  return { hit: false, reason: null }
+}
+
+async function processOneWatch(watch) {
+  try {
+    const snapshot = await fetchCurrentPrice(watch)
+    const saved = await saveSnapshotForWatch({ watchJob: watch, snapshot })
+    if (!saved.enabled) {
+      console.log(`[worker] DATABASE_URL not set. skip watch#${watch.id}`)
+      return
+    }
+
+    const decision = evaluateHit({
+      watch,
+      previousMinPrice: saved.previousMinPrice,
+      latestPrice: saved.latestPrice,
+    })
+
+    if (!decision.hit) {
+      console.log(`[worker] watch#${watch.id} no hit (${saved.latestPrice})`)
+      return
+    }
+
+    const message =
+      decision.reason === 'target_price'
+        ? `목표가 도달: ${saved.latestPrice} <= ${watch.targetPrice}`
+        : `신규 최저가 갱신: ${saved.latestPrice}`
+
+    const notifyResult = await notifyPriceHit({
+      watchJob: watch,
+      snapshot,
+      reason: decision.reason,
+    })
+
+    await createNotificationEvent({
+      watchJobId: watch.id,
+      productId: saved.productId,
+      type: decision.reason,
+      message,
+      payload: notifyResult.payload,
+      status: notifyResult.ok ? 'sent' : 'failed',
+    })
+  } catch (error) {
+    await markWatchError(watch.id, error.message)
+    console.error(`[worker] watch#${watch.id} failed:`, error.message)
+  }
+}
+
+async function run() {
+  const watches = await listActiveWatchJobs()
+  console.log(`[worker] fetched ${watches.length} active watch jobs`)
+
+  for (const watch of watches) {
+    await processOneWatch(watch)
+  }
+}
+
+run().catch((error) => {
+  console.error('[worker] fatal:', error)
+  process.exit(1)
+})

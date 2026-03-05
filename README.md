@@ -1,16 +1,111 @@
-# React + Vite
+# Rare Pick MVP
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+쿠팡/아마존 상품 URL 등록 기반의 가격 추적 + 최저가 알림 MVP입니다.
 
-Currently, two official plugins are available:
+## 포함된 것
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Next.js(App Router) 대시보드: URL 등록 + 감시 목록 조회
+- DB 스키마: `products`, `price_history`, `click_events`, `affiliate_reports`
+- URL 감시 스키마: `watch_jobs`, `notifications`
+- API 엔드포인트:
+  - `POST /api/watch` (상품 URL 등록)
+  - `GET /api/watch` (등록 목록 조회)
+- 수집 배치 스크립트:
+  - 가격 스냅샷 수집
+  - PostgreSQL 직접 적재(`DATABASE_URL` 있을 때)
+  - NDJSON 백업 저장
+- 워커 스크립트:
+  - 활성 watch 조회
+  - 가격 수집/히스토리 저장
+  - 최저가 조건 체크
+  - 알림 기록/발송
 
-## React Compiler
+## 실행
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm install
+npm run dev
+```
 
-## Expanding the ESLint configuration
+브라우저: `http://localhost:3000`
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Cloudflare 배포(Workers + OpenNext)
+
+이 프로젝트는 정적 사이트가 아니라 Next.js 서버 기능(API/SSR)을 사용하므로, Cloudflare에서 `Pages 정적 배포`가 아니라 `Workers` 방식으로 배포해야 합니다.
+
+1. 대시보드에서 이 저장소를 **Workers** 프로젝트로 연결
+2. Build command: `npm run cf:build`
+3. Deploy command: `npm run deploy`
+4. Production 환경변수에 `.env`의 값들(`DATABASE_URL` 등) 동일하게 등록
+
+로컬 검증:
+
+```bash
+npm run cf:build
+npm run preview
+```
+
+## 동작 흐름
+
+1. 사용자 상품 URL 등록 (`POST /api/watch`)
+2. `watch_jobs` 저장
+3. 워커가 주기 실행 (`npm run worker:watch`)
+4. 가격 수집 후 `price_history` 저장
+5. 신규 최저가 또는 목표가 도달 검사
+6. 조건 충족 시 `notifications` 기록 + 웹훅 알림
+
+## 가격 수집 배치 실행
+
+```bash
+npm run collect:prices
+```
+
+기본값은 `collector/out/price-history.ndjson` 에 기록되고, `DATABASE_URL`이 설정되면 DB에도 적재됩니다.
+
+## URL 기반 워커 실행
+
+```bash
+npm run worker:watch
+```
+
+크론 예시(5분 간격):
+
+```bash
+*/5 * * * * cd /home/user/rare-pick && /usr/bin/npm run worker:watch >> /tmp/rare-pick-worker.log 2>&1
+```
+
+## 실제 API 연동 방식
+
+- Amazon: PA-API v5 `GetItems`를 AWS SigV4로 서명해 호출
+  - 파일: `collector/fetchers/amazon-paapi.js`
+  - 필수: `AMAZON_PAAPI_ACCESS_KEY`, `AMAZON_PAAPI_SECRET_KEY`, `AMAZON_ASSOCIATE_TAG`
+- Coupang: Open API 요청을 HMAC(`CEA algorithm=HmacSHA256`)로 서명해 호출
+  - 파일: `collector/fetchers/coupang-openapi.js`
+  - 필수: `COUPANG_ACCESS_KEY`, `COUPANG_SECRET_KEY`
+
+키 또는 응답 파싱 실패 시 자동으로 mock 가격 fallback으로 동작하며, 원인은 `fetchedWith` 로그에 남습니다.
+
+## 환경변수
+
+`.env.example` 참고:
+
+```bash
+cp .env.example .env
+```
+
+- `DATABASE_URL`이 없으면 앱/수집기 모두 mock/fallback 모드로 동작합니다.
+- 아마존/쿠팡 API 키가 없으면 수집기는 mock 가격으로 동작합니다.
+- 쿠팡 API 경로가 계정/권한에 따라 다르면 `COUPANG_OPENAPI_PATH_TEMPLATE`를 수정하세요.
+- `NOTIFY_WEBHOOK_URL` 설정 시 조건 충족 알림을 웹훅으로 발송합니다.
+
+## DB 스키마 적용
+
+PostgreSQL에 아래 파일을 적용하세요.
+
+`db/schema.sql`
+
+## Next.js 전환 안내
+
+권장 폴더 구조와 API 경로는 다음 문서에 정리했습니다.
+
+`docs/nextjs-mvp-structure.md`
