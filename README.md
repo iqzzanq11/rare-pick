@@ -82,16 +82,19 @@ npm run worker:watch
 */5 * * * * cd /home/user/rare-pick && /usr/bin/npm run worker:watch >> /tmp/rare-pick-worker.log 2>&1
 ```
 
+30분 간격 예시:
+
+```bash
+*/30 * * * * cd /home/user/rare-pick && /usr/bin/npm run worker:watch >> /tmp/rare-pick-worker.log 2>&1
+```
+
 ## 실제 API 연동 방식
 
-- Amazon: PA-API v5 `GetItems`를 AWS SigV4로 서명해 호출
-  - 파일: `collector/fetchers/amazon-paapi.js`
-  - 필수: `AMAZON_PAAPI_ACCESS_KEY`, `AMAZON_PAAPI_SECRET_KEY`, `AMAZON_ASSOCIATE_TAG`
-- Coupang: Open API 요청을 HMAC(`CEA algorithm=HmacSHA256`)로 서명해 호출
-  - 파일: `collector/fetchers/coupang-openapi.js`
-  - 필수: `COUPANG_ACCESS_KEY`, `COUPANG_SECRET_KEY`
-
-키 또는 응답 파싱 실패 시 자동으로 mock 가격 fallback으로 동작하며, 원인은 `fetchedWith` 로그에 남습니다.
+- Amazon/Coupang 상품 URL HTML을 직접 요청해 가격을 파싱합니다.
+  - 파일: `collector/fetchers/amazon-paapi.js`, `collector/fetchers/coupang-openapi.js`
+  - 공통 유틸: `collector/fetchers/html-price.js`
+- 파싱/요청 실패 시 해당 watch는 `last_error`에 실패 원인이 기록됩니다.
+- 알림은 `NOTIFY_WEBHOOK_URL`이 설정된 경우 웹훅으로 발송됩니다.
 
 ## 환경변수
 
@@ -101,13 +104,12 @@ npm run worker:watch
 cp .env.example .env
 ```
 
-- `DATABASE_URL`이 없으면 앱/수집기 모두 mock/fallback 모드로 동작합니다.
+- `DATABASE_URL`이 없으면 앱은 로컬 fallback 모드로 동작하고, 워커는 DB 저장을 건너뜁니다.
 - `ALLOWED_ORIGINS`는 쉼표(,)로 여러 도메인 허용 가능
 - 프론트는 기본적으로 같은 도메인의 `/api/*`를 호출합니다.
 - 외부 API를 쓰고 싶으면 `NEXT_PUBLIC_API_BASE_URL`(또는 기존 호환 변수)로 오버라이드할 수 있습니다.
-- 아마존/쿠팡 API 키가 없으면 수집기는 mock 가격으로 동작합니다.
-- 쿠팡 API 경로가 계정/권한에 따라 다르면 `COUPANG_OPENAPI_PATH_TEMPLATE`를 수정하세요.
 - `NOTIFY_WEBHOOK_URL` 설정 시 조건 충족 알림을 웹훅으로 발송합니다.
+- `PRICE_FETCH_TIMEOUT_MS`로 상품 페이지 요청 타임아웃(ms)을 조정할 수 있습니다.
 
 ## DB 스키마 적용
 
