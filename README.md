@@ -7,9 +7,9 @@
 - Next.js(App Router) 대시보드: URL 등록 + 감시 목록 조회
 - DB 스키마: `products`, `price_history`, `click_events`, `affiliate_reports`
 - URL 감시 스키마: `watch_jobs`, `notifications`
-- API 엔드포인트:
-  - `POST /api/watch` (상품 URL 등록)
-  - `GET /api/watch` (등록 목록 조회)
+- 정적 배포 모드:
+  - 등록 데이터는 브라우저 `localStorage`에 저장
+  - 서버 API 라우트는 `legacy-api/app-api`로 분리 보관
 - 수집 배치 스크립트:
   - 가격 스냅샷 수집
   - PostgreSQL 직접 적재(`DATABASE_URL` 있을 때)
@@ -29,30 +29,20 @@ npm run dev
 
 브라우저: `http://localhost:3000`
 
-## Cloudflare 배포(Workers + OpenNext)
+## Cloudflare Pages 배포
 
-이 프로젝트는 정적 사이트가 아니라 Next.js 서버 기능(API/SSR)을 사용하므로, Cloudflare에서 `Pages 정적 배포`가 아니라 `Workers` 방식으로 배포해야 합니다.
+이 저장소는 `next.config.mjs`에서 `output: 'export'`를 사용하므로 정적 파일(`out`)로 배포됩니다.
 
-1. 대시보드에서 이 저장소를 **Workers** 프로젝트로 연결
-2. Build command: `npm run cf:build`
-3. Deploy command: `npm run deploy`
-4. Production 환경변수에 `.env`의 값들(`DATABASE_URL` 등) 동일하게 등록
-
-로컬 검증:
-
-```bash
-npm run cf:build
-npm run preview
-```
+1. 대시보드에서 이 저장소를 **Pages** 프로젝트로 연결
+2. Build command: `npm run build`
+3. Build output directory: `out`
+4. Node.js 버전은 20 이상 권장
 
 ## 동작 흐름
 
-1. 사용자 상품 URL 등록 (`POST /api/watch`)
-2. `watch_jobs` 저장
-3. 워커가 주기 실행 (`npm run worker:watch`)
-4. 가격 수집 후 `price_history` 저장
-5. 신규 최저가 또는 목표가 도달 검사
-6. 조건 충족 시 `notifications` 기록 + 웹훅 알림
+1. 사용자 상품 URL 등록 (브라우저 내 처리)
+2. 등록 목록을 `localStorage`에 저장
+3. 페이지 재방문 시 로컬 저장 목록 조회
 
 ## 가격 수집 배치 실행
 

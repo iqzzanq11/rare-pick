@@ -11,11 +11,10 @@ node_modules
 dist
 dist-ssr
 .next
-out/*
-!out/.gitkeep
-*.local
+out
+collector/out
 .open-next
-.wrangler
+*.local
 
 # Editor directories and files
 .vscode/*

@@ -7,15 +7,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "cf:build": "opennextjs-cloudflare build",
-    "preview": "opennextjs-cloudflare preview",
-    "deploy": "opennextjs-cloudflare deploy",
     "lint": "eslint .",
     "collect:prices": "node collector/run-price-collector.js",
     "worker:watch": "node collector/run-watch-worker.js"
   },
   "dependencies": {
-    "@opennextjs/cloudflare": "^1.8.2",
     "next": "^15.3.0",
     "pg": "^8.16.3",
     "react": "^19.2.0",
@@ -23,7 +19,6 @@
   },
   "devDependencies": {
     "eslint": "^9.39.1",
-    "eslint-config-next": "^15.3.0",
-    "wrangler": "^4.44.0"
+    "eslint-config-next": "^15.3.0"
   }
 }

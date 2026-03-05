@@ -1,6 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { parseProductUrl } from '../lib/url-parser'
+
+const STORAGE_KEY = 'rare-pick-watches-v1'
 
 function formatMoney(value) {
   if (value === null || value === undefined) {
@@ -17,26 +20,58 @@ export default function WatchDashboard({ initialWatches, dbError }) {
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (!raw) {
+        return
+      }
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        setWatches(parsed)
+      }
+    } catch {
+      localStorage.removeItem(STORAGE_KEY)
+    }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(watches))
+  }, [watches])
+
   async function onSubmit(event) {
     event.preventDefault()
     setError('')
     setIsSubmitting(true)
 
     try {
-      const response = await fetch('/api/watch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productUrl,
-          targetPrice: targetPrice || null,
-          notifyEmail: notifyEmail || null,
-        }),
-      })
-      const payload = await response.json()
-      if (!response.ok) {
-        throw new Error(payload?.error ?? 'watch 등록 실패')
+      const parsed = parseProductUrl(productUrl)
+      const normalizedTargetPrice =
+        targetPrice === undefined || targetPrice === null || targetPrice === ''
+          ? null
+          : Number(targetPrice)
+
+      if (normalizedTargetPrice !== null && !Number.isFinite(normalizedTargetPrice)) {
+        throw new Error('targetPrice는 숫자여야 합니다.')
       }
-      setWatches((prev) => [payload.watch, ...prev])
+
+      const nowIso = new Date().toISOString()
+      const watch = {
+        id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`,
+        source: parsed.source,
+        externalId: parsed.externalId,
+        title: `[${parsed.source}] ${parsed.externalId}`,
+        productUrl: parsed.canonicalUrl,
+        targetPrice: normalizedTargetPrice,
+        notifyEmail: notifyEmail || null,
+        isActive: true,
+        lastCheckedAt: null,
+        lastPrice: null,
+        lowestPrice: 0,
+        lastError: null,
+        createdAt: nowIso,
+      }
+      setWatches((prev) => [watch, ...prev])
       setProductUrl('')
       setTargetPrice('')
       setNotifyEmail('')
@@ -52,7 +87,7 @@ export default function WatchDashboard({ initialWatches, dbError }) {
       <header className="hero">
         <p className="eyebrow">Rare Pick Watcher</p>
         <h1>상품 URL 입력 기반 최저가 알림 시스템</h1>
-        <p>URL 등록 후 워커가 주기적으로 가격을 수집하고, 최저가 조건을 만족하면 알림을 발송합니다.</p>
+        <p>Pages 정적 배포 모드에서는 브라우저 로컬 저장소에 등록 목록이 저장됩니다.</p>
         {dbError ? <p className="error">DB 연결 오류: {dbError}</p> : null}
       </header>
 
