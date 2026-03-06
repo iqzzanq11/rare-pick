@@ -27,6 +27,17 @@ function normalizeCurrency(raw) {
   return /^[A-Z]{3}$/.test(token) ? token : null
 }
 
+function detectCurrencyFromPage(html) {
+  const byJson = html.match(/"priceCurrency"\s*:\s*"([A-Z]{3})"/i)
+  if (byJson) {
+    return normalizeCurrency(byJson[1]) || 'USD'
+  }
+  if (/\bKRW\b|₩|원/.test(html)) {
+    return 'KRW'
+  }
+  return 'USD'
+}
+
 function stripTags(value) {
   return String(value || '')
     .replace(/<[^>]+>/g, ' ')
@@ -34,6 +45,27 @@ function stripTags(value) {
     .replace(/&amp;/gi, '&')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+function decodeHtmlEntities(value) {
+  return String(value || '')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+}
+
+function normalizeTitle(value) {
+  const stripped = stripTags(decodeHtmlEntities(value))
+  if (!stripped) {
+    return null
+  }
+  return stripped.replace(/\s*[:\-|]\s*amazon.*$/i, '').trim() || null
+}
+
+function isPlaceholderTitle(value) {
+  return /^\[(amazon|coupang)\]\s+[A-Z0-9]+$/i.test(String(value || '').trim())
 }
 
 function parseJsonLdObjects(html) {
@@ -140,7 +172,7 @@ function extractAmazonMetadata(html, fallbackTitle = null) {
     }
 
     if (!title && typeof product.name === 'string') {
-      title = product.name.trim()
+      title = normalizeTitle(product.name)
     }
     if (!imageUrl) {
       if (typeof product.image === 'string') {
@@ -157,17 +189,29 @@ function extractAmazonMetadata(html, fallbackTitle = null) {
   if (!title) {
     const byProductTitle = html.match(/id=["']productTitle["'][^>]*>\s*([^<]+)\s*</i)
     if (byProductTitle) {
-      title = stripTags(byProductTitle[1])
+      title = normalizeTitle(byProductTitle[1])
     }
   }
   if (!title) {
     const byOg = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)
     if (byOg) {
-      title = stripTags(byOg[1])
+      title = normalizeTitle(byOg[1])
+    }
+  }
+  if (!title) {
+    const byTitleTag = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
+    if (byTitleTag) {
+      title = normalizeTitle(byTitleTag[1])
+    }
+  }
+  if (!title) {
+    const byFeatureBullets = html.match(/id=["']feature-bullets["'][\s\S]{0,300}?<h1[^>]*>([\s\S]*?)<\/h1>/i)
+    if (byFeatureBullets) {
+      title = normalizeTitle(byFeatureBullets[1])
     }
   }
   if (!title && typeof fallbackTitle === 'string' && fallbackTitle.trim()) {
-    title = fallbackTitle.trim().replace(/\s*[:\-|]\s*amazon.*$/i, '')
+    title = normalizeTitle(fallbackTitle)
   }
 
   if (!imageUrl) {
@@ -240,27 +284,6 @@ function extractAmazonHtmlPrice(html) {
     return byJsonLdOffer
   }
 
-  const byJsonLd = extractJsonLdPrice(html)
-  if (byJsonLd !== null) {
-    return { price: byJsonLd, currency: 'USD' }
-  }
-
-  const byRegex = extractByRegexList(html, [
-    /"priceToPay"\s*:\s*\{"priceAmount"\s*:\s*([0-9]+(?:\.[0-9]+)?)/i,
-    /"priceAmount"\s*:\s*([0-9]+(?:\.[0-9]+)?)/i,
-    /data-a-price=["']([0-9]+(?:\.[0-9]+)?)["']/i,
-    /id=["']corePriceDisplay_desktop_feature_div["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["'][^>]*>\s*[$]?([0-9.,]+)/i,
-    /id=["']priceblock_ourprice["'][^>]*>\s*[$]?([0-9.,]+)/i,
-    /id=["']priceblock_dealprice["'][^>]*>\s*[$]?([0-9.,]+)/i,
-    /id=["']price_inside_buybox["'][^>]*>\s*[$]?([0-9.,]+)/i,
-    /class=["'][^"']*a-offscreen[^"']*["'][^>]*>\s*[$]?([0-9.,]+)/i,
-    /<meta[^>]+property=["']product:price:amount["'][^>]+content=["']([0-9,]+(?:\.[0-9]+)?)["']/i,
-    /<meta[^>]+itemprop=["']price["'][^>]+content=["']([0-9,]+(?:\.[0-9]+)?)["']/i,
-  ])
-  if (byRegex !== null) {
-    return { price: byRegex, currency: 'USD' }
-  }
-
   const currencyAware = [
     /"priceCurrency"\s*:\s*"([A-Z]{3})"[\s\S]{0,200}?"price"\s*:\s*"([0-9.,]+)"/i,
     /"price"\s*:\s*"([0-9.,]+)"[\s\S]{0,200}?"priceCurrency"\s*:\s*"([A-Z]{3})"/i,
@@ -279,6 +302,26 @@ function extractAmazonHtmlPrice(html) {
     }
   }
 
+  const byJsonLd = extractJsonLdPrice(html)
+  if (byJsonLd !== null) {
+    return { price: byJsonLd, currency: detectCurrencyFromPage(html) }
+  }
+
+  const byRegex = extractByRegexList(html, [
+    /"priceToPay"\s*:\s*\{"priceAmount"\s*:\s*([0-9]+(?:\.[0-9]+)?)/i,
+    /"priceAmount"\s*:\s*([0-9]+(?:\.[0-9]+)?)/i,
+    /data-a-price=["']([0-9]+(?:\.[0-9]+)?)["']/i,
+    /id=["']corePriceDisplay_desktop_feature_div["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["'][^>]*>\s*[$]?([0-9.,]+)/i,
+    /id=["']priceblock_ourprice["'][^>]*>\s*[$]?([0-9.,]+)/i,
+    /id=["']priceblock_dealprice["'][^>]*>\s*[$]?([0-9.,]+)/i,
+    /id=["']price_inside_buybox["'][^>]*>\s*[$]?([0-9.,]+)/i,
+    /<meta[^>]+property=["']product:price:amount["'][^>]+content=["']([0-9,]+(?:\.[0-9]+)?)["']/i,
+    /<meta[^>]+itemprop=["']price["'][^>]+content=["']([0-9,]+(?:\.[0-9]+)?)["']/i,
+  ])
+  if (byRegex !== null) {
+    return { price: byRegex, currency: detectCurrencyFromPage(html) }
+  }
+
   return null
 }
 
@@ -290,9 +333,10 @@ export async function fetchAmazonPrice(item) {
   const doc = await fetchHtmlDocument(item.affiliateUrl, { language: 'en-US,en;q=0.9' })
   let money = extractAmazonHtmlPrice(doc.html)
   let metadata = extractAmazonMetadata(doc.html, doc.title)
+  let httpDoc = null
 
   if (money === null && (detectBlockedPage(doc) || !looksLikeAmazonProductPage(doc))) {
-    const httpDoc = await fetchHtmlDocument(item.affiliateUrl, {
+    httpDoc = await fetchHtmlDocument(item.affiliateUrl, {
       language: 'en-US,en;q=0.9',
       mode: 'http-only',
     })
@@ -308,6 +352,23 @@ export async function fetchAmazonPrice(item) {
       throw new Error(
         `amazon resolved to non-product page (browser finalUrl=${doc.finalUrl || 'unknown'}, browser title=${doc.title || 'unknown'}, http finalUrl=${httpDoc.finalUrl || 'unknown'})`,
       )
+    }
+  }
+
+  if ((!metadata.imageUrl || !metadata.category || !metadata.title || isPlaceholderTitle(metadata.title)) && !httpDoc) {
+    try {
+      httpDoc = await fetchHtmlDocument(item.affiliateUrl, {
+        language: 'en-US,en;q=0.9',
+        mode: 'http-only',
+      })
+      const enriched = extractAmazonMetadata(httpDoc.html, httpDoc.title)
+      metadata = {
+        title: !metadata.title || isPlaceholderTitle(metadata.title) ? enriched.title || metadata.title : metadata.title,
+        imageUrl: metadata.imageUrl || enriched.imageUrl,
+        category: metadata.category || enriched.category,
+      }
+    } catch {
+      // keep primary metadata if http enrichment fails
     }
   }
 

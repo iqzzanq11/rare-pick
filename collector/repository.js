@@ -50,7 +50,10 @@ export async function insertSnapshotsToDb(snapshots) {
           VALUES ($1, $2, $3, $4, $5, $6)
           ON CONFLICT (source, external_id)
           DO UPDATE SET
-            title = EXCLUDED.title,
+            title = CASE
+              WHEN EXCLUDED.title ~ '^\\[(amazon|coupang)\\]\\s+[A-Za-z0-9]+' THEN products.title
+              ELSE EXCLUDED.title
+            END,
             image_url = COALESCE(EXCLUDED.image_url, products.image_url),
             affiliate_url = EXCLUDED.affiliate_url,
             category = COALESCE(EXCLUDED.category, products.category),
@@ -141,7 +144,10 @@ export async function saveSnapshotForWatch({ watchJob, snapshot, errorMessage = 
         VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (source, external_id)
         DO UPDATE SET
-          title = EXCLUDED.title,
+          title = CASE
+            WHEN EXCLUDED.title ~ '^\\[(amazon|coupang)\\]\\s+[A-Za-z0-9]+' THEN products.title
+            ELSE EXCLUDED.title
+          END,
           image_url = COALESCE(EXCLUDED.image_url, products.image_url),
           affiliate_url = EXCLUDED.affiliate_url,
           category = COALESCE(EXCLUDED.category, products.category),
