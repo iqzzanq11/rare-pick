@@ -13,6 +13,10 @@ function normalizeNumber(raw) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+function isValidPrice(value) {
+  return Number.isFinite(value) && value > 0
+}
+
 function normalizeCurrency(raw) {
   const token = String(raw || '').trim().toUpperCase()
   if (!token) {
@@ -37,6 +41,7 @@ function detectCurrencyFromPage(html) {
   }
   return 'USD'
 }
+
 
 function stripTags(value) {
   return String(value || '')
@@ -104,7 +109,7 @@ function findOfferNode(value) {
         ? normalizeNumber(value.price)
         : null
 
-  if (currency && Number.isFinite(numericPrice)) {
+  if (currency && isValidPrice(numericPrice)) {
     return { price: numericPrice, currency }
   }
 
@@ -297,13 +302,13 @@ function extractAmazonHtmlPrice(html) {
     const candidates = [match[1], match[2]]
     const currency = candidates.map(normalizeCurrency).find(Boolean) || null
     const price = candidates.map(normalizeNumber).find((value) => value !== null)
-    if (currency && price !== null) {
+    if (currency && price !== null && isValidPrice(price)) {
       return { price, currency }
     }
   }
 
   const byJsonLd = extractJsonLdPrice(html)
-  if (byJsonLd !== null) {
+  if (byJsonLd !== null && isValidPrice(byJsonLd)) {
     return { price: byJsonLd, currency: detectCurrencyFromPage(html) }
   }
 
@@ -318,7 +323,7 @@ function extractAmazonHtmlPrice(html) {
     /<meta[^>]+property=["']product:price:amount["'][^>]+content=["']([0-9,]+(?:\.[0-9]+)?)["']/i,
     /<meta[^>]+itemprop=["']price["'][^>]+content=["']([0-9,]+(?:\.[0-9]+)?)["']/i,
   ])
-  if (byRegex !== null) {
+  if (byRegex !== null && isValidPrice(byRegex)) {
     return { price: byRegex, currency: detectCurrencyFromPage(html) }
   }
 
@@ -375,6 +380,11 @@ export async function fetchAmazonPrice(item) {
   if (money === null) {
     throw new Error(
       `amazon price not found from page html (finalUrl=${doc.finalUrl || 'unknown'}, title=${doc.title || 'unknown'})`,
+    )
+  }
+  if (!isValidPrice(money.price)) {
+    throw new Error(
+      `amazon invalid price extracted: ${money.price} (finalUrl=${doc.finalUrl || 'unknown'}, title=${doc.title || 'unknown'})`,
     )
   }
 

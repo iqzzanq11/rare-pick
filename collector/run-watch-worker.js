@@ -91,6 +91,7 @@ async function processOneWatch(watch, usdKrwRate) {
       watchJob: watch,
       snapshot,
       reason: decision.reason,
+      latestPriceKrw,
     })
 
     await createNotificationEvent({
