@@ -46,16 +46,25 @@ export async function insertSnapshotsToDb(snapshots) {
     for (const snapshot of snapshots) {
       const productResult = await client.query(
         `
-          INSERT INTO products (source, external_id, title, affiliate_url)
-          VALUES ($1, $2, $3, $4)
+          INSERT INTO products (source, external_id, title, image_url, affiliate_url, category)
+          VALUES ($1, $2, $3, $4, $5, $6)
           ON CONFLICT (source, external_id)
           DO UPDATE SET
             title = EXCLUDED.title,
+            image_url = COALESCE(EXCLUDED.image_url, products.image_url),
             affiliate_url = EXCLUDED.affiliate_url,
+            category = COALESCE(EXCLUDED.category, products.category),
             updated_at = NOW()
           RETURNING id
         `,
-        [snapshot.source, snapshot.externalId, snapshot.title, snapshot.affiliateUrl],
+        [
+          snapshot.source,
+          snapshot.externalId,
+          snapshot.title,
+          snapshot.imageUrl ?? null,
+          snapshot.affiliateUrl,
+          snapshot.category ?? null,
+        ],
       )
 
       await client.query(
@@ -128,16 +137,25 @@ export async function saveSnapshotForWatch({ watchJob, snapshot, errorMessage = 
 
     const productResult = await client.query(
       `
-        INSERT INTO products (source, external_id, title, affiliate_url)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO products (source, external_id, title, image_url, affiliate_url, category)
+        VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (source, external_id)
         DO UPDATE SET
           title = EXCLUDED.title,
+          image_url = COALESCE(EXCLUDED.image_url, products.image_url),
           affiliate_url = EXCLUDED.affiliate_url,
+          category = COALESCE(EXCLUDED.category, products.category),
           updated_at = NOW()
         RETURNING id
       `,
-      [snapshot.source, snapshot.externalId, snapshot.title, snapshot.affiliateUrl],
+      [
+        snapshot.source,
+        snapshot.externalId,
+        snapshot.title,
+        snapshot.imageUrl ?? null,
+        snapshot.affiliateUrl,
+        snapshot.category ?? null,
+      ],
     )
     const productId = productResult.rows[0].id
 
