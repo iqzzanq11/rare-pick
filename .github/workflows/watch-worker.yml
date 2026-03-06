@@ -22,7 +22,7 @@ jobs:
       AMAZON_PAAPI_ACCESS_KEY: ${{ secrets.AMAZON_PAAPI_ACCESS_KEY }}
       AMAZON_PAAPI_SECRET_KEY: ${{ secrets.AMAZON_PAAPI_SECRET_KEY }}
       AMAZON_ASSOCIATE_TAG: ${{ secrets.AMAZON_ASSOCIATE_TAG }}
-      PRICE_FETCH_MODE: http-only
+      PRICE_FETCH_MODE: browser-first
       PRICE_FETCH_TIMEOUT_MS: "20000"
       USD_KRW_RATE: "1350"
       USD_KRW_RATE_API_URL: https://open.er-api.com/v6/latest/USD
