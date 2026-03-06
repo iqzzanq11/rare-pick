@@ -1,3 +1,26 @@
+import nodemailer from 'nodemailer'
+
+let mailTransporter = null
+
+function getMailTransporter() {
+  if (mailTransporter) {
+    return mailTransporter
+  }
+
+  const user = process.env.GMAIL_SMTP_USER
+  const pass = process.env.GMAIL_SMTP_APP_PASSWORD
+  if (!user || !pass) {
+    return null
+  }
+
+  mailTransporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user, pass },
+  })
+
+  return mailTransporter
+}
+
 async function sendWebhook(payload) {
   const webhook = process.env.NOTIFY_WEBHOOK_URL
   if (!webhook) {
@@ -20,9 +43,9 @@ async function sendTargetPriceEmail({ watchJob, snapshot, latestPriceKrw }) {
     return { delivered: false, channel: 'email-skipped' }
   }
 
-  const apiKey = process.env.RESEND_API_KEY
-  const fromEmail = process.env.NOTIFY_FROM_EMAIL
-  if (!apiKey || !fromEmail) {
+  const fromEmail = process.env.NOTIFY_FROM_EMAIL || process.env.GMAIL_SMTP_USER
+  const transporter = getMailTransporter()
+  if (!fromEmail || !transporter) {
     return { delivered: false, channel: 'email-not-configured' }
   }
 
@@ -35,24 +58,12 @@ async function sendTargetPriceEmail({ watchJob, snapshot, latestPriceKrw }) {
     `- 목표가: ${watchJob.targetPrice} KRW`,
   ].join('\n')
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      from: fromEmail,
-      to: [watchJob.notifyEmail],
-      subject,
-      text,
-    }),
+  await transporter.sendMail({
+    from: fromEmail,
+    to: watchJob.notifyEmail,
+    subject,
+    text,
   })
-
-  if (!response.ok) {
-    const body = await response.text()
-    throw new Error(`email notify failed: ${response.status} ${response.statusText} ${body}`)
-  }
 
   return { delivered: true, channel: 'email' }
 }

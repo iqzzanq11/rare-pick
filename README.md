@@ -117,8 +117,9 @@ cp .env.example .env
 - 외부 API를 쓰고 싶으면 `NEXT_PUBLIC_API_BASE_URL`(또는 기존 호환 변수)로 오버라이드할 수 있습니다.
 - `NOTIFY_WEBHOOK_URL` 설정 시 조건 충족 알림을 웹훅으로 발송합니다.
 - 목표가 도달(`현재가 <= 목표가`) 시 `notify_email`이 있는 watch는 이메일도 발송할 수 있습니다.
-  - `RESEND_API_KEY`, `NOTIFY_FROM_EMAIL` 설정 필요
-  - 이메일 발송 경로: Resend API (`https://api.resend.com/emails`)
+  - Gmail SMTP 설정 필요: `GMAIL_SMTP_USER`, `GMAIL_SMTP_APP_PASSWORD`
+  - `NOTIFY_FROM_EMAIL`을 비우면 `GMAIL_SMTP_USER`를 발신 주소로 사용합니다.
+  - Gmail은 일반 비밀번호 대신 앱 비밀번호 사용이 필요합니다.
 - `PRICE_FETCH_MODE`:
   - `browser-first`(기본): Playwright 우선, 실패 시 HTTP fallback
   - `browser-only`: Playwright만 사용
