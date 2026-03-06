@@ -121,6 +121,13 @@ cp .env.example .env
   - `browser-only`: Playwright만 사용
   - `http-only`: 브라우저 없이 HTTP만 사용
 - `PRICE_FETCH_TIMEOUT_MS`로 상품 페이지 요청 타임아웃(ms)을 조정할 수 있습니다.
+- `USD_KRW_RATE`는 USD 가격을 KRW로 환산할 때 사용하는 기본/폴백 환율입니다(기본값 `1350`).
+- 워커는 USD->KRW 환율을 하루 1회 자동 갱신합니다.
+  - `USD_KRW_RATE_API_URL` (기본 `https://open.er-api.com/v6/latest/USD`)
+  - `USD_KRW_RATE_TIMEOUT_MS` (기본 `10000`)
+  - `USD_KRW_RATE_CACHE_FILE` (기본 `collector/out/usd-krw-rate.json`)
+  - API 실패 시: 캐시 값(있으면) -> `USD_KRW_RATE` 순으로 폴백
+  - 가격 히스토리(`price_history`)와 상품 원본 가격(`watch_jobs.last_price`)은 URL 원본 통화(예: USD) 그대로 저장됩니다.
 
 ## DB 스키마 적용
 
