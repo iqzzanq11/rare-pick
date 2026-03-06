@@ -1,6 +1,19 @@
 import nodemailer from 'nodemailer'
 
 let mailTransporter = null
+const numberFormatter = new Intl.NumberFormat('ko-KR')
+
+function formatNumber(value) {
+  const num = Number(value)
+  if (!Number.isFinite(num)) {
+    return String(value)
+  }
+  return numberFormatter.format(num)
+}
+
+function formatPrice(value, currency) {
+  return `${formatNumber(value)} ${currency}`
+}
 
 function getMailTransporter() {
   if (mailTransporter) {
@@ -49,13 +62,15 @@ async function sendTargetPriceEmail({ watchJob, snapshot, latestPriceKrw }) {
     return { delivered: false, channel: 'email-not-configured' }
   }
 
-  const subject = `[Rare Pick] 목표가 도달 알림 (${latestPriceKrw} KRW)`
+  const subject = `[Rare Pick] 목표가 도달 알림 (${formatPrice(latestPriceKrw, 'KRW')})`
   const text = [
     '설정한 목표가에 도달했습니다.',
-    `- 상품 URL: ${watchJob.productUrl}`,
-    `- 현재가(원본): ${snapshot.price} ${snapshot.currency}`,
-    `- 현재가(환산): ${latestPriceKrw} KRW`,
-    `- 목표가: ${watchJob.targetPrice} KRW`,
+    '',
+    `상품 URL: ${watchJob.productUrl}`,
+    '',
+    `현재가(원본): ${formatPrice(snapshot.price, snapshot.currency)}`,
+    `현재가(환산): ${formatPrice(latestPriceKrw, 'KRW')}`,
+    `목표가: ${formatPrice(watchJob.targetPrice, 'KRW')}`,
   ].join('\n')
 
   await transporter.sendMail({
