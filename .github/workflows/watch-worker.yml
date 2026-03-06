@@ -1,0 +1,45 @@
+name: Watch Worker
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: watch-worker
+  cancel-in-progress: false
+
+jobs:
+  run-worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      NOTIFY_WEBHOOK_URL: ${{ secrets.NOTIFY_WEBHOOK_URL }}
+      NOTIFY_FROM_EMAIL: ${{ secrets.NOTIFY_FROM_EMAIL }}
+      GMAIL_SMTP_USER: ${{ secrets.GMAIL_SMTP_USER }}
+      GMAIL_SMTP_APP_PASSWORD: ${{ secrets.GMAIL_SMTP_APP_PASSWORD }}
+      AMAZON_PAAPI_ACCESS_KEY: ${{ secrets.AMAZON_PAAPI_ACCESS_KEY }}
+      AMAZON_PAAPI_SECRET_KEY: ${{ secrets.AMAZON_PAAPI_SECRET_KEY }}
+      AMAZON_ASSOCIATE_TAG: ${{ secrets.AMAZON_ASSOCIATE_TAG }}
+      PRICE_FETCH_MODE: http-only
+      PRICE_FETCH_TIMEOUT_MS: "20000"
+      USD_KRW_RATE: "1350"
+      USD_KRW_RATE_API_URL: https://open.er-api.com/v6/latest/USD
+      USD_KRW_RATE_TIMEOUT_MS: "10000"
+      USD_KRW_RATE_CACHE_FILE: collector/out/usd-krw-rate.json
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run watch worker
+        run: node collector/run-watch-worker.js
