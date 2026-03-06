@@ -167,7 +167,7 @@ export default function WatchDashboard({ initialWatches, dbError }) {
             <input
               required
               type="url"
-              placeholder="https://www.amazon.com/dp/ASIN 또는 https://www.coupang.com/vp/products/ID"
+              placeholder="https://www.amazon.com/dp/ASIN"
               value={productUrl}
               onChange={(event) => setProductUrl(event.target.value)}
             />

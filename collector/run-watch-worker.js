@@ -1,5 +1,4 @@
 import { fetchAmazonPrice } from './fetchers/amazon-paapi.js'
-import { fetchCoupangPrice } from './fetchers/coupang-openapi.js'
 import {
   createNotificationEvent,
   listActiveWatchJobs,
@@ -23,7 +22,7 @@ async function fetchCurrentPrice(watch) {
     return fetchAmazonPrice(item)
   }
   if (watch.source === 'coupang') {
-    return fetchCoupangPrice(item)
+    throw new Error('coupang fetch is temporarily paused')
   }
   throw new Error(`unsupported source: ${watch.source}`)
 }

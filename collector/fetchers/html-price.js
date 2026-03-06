@@ -115,7 +115,13 @@ async function fetchHtmlWithHttp(url, { language, timeoutMs }) {
       throw new Error(`request failed: ${response.status} ${response.statusText}`)
     }
 
-    return response.text()
+    const html = await response.text()
+    return {
+      html,
+      finalUrl: response.url || url,
+      title: null,
+      fetchedWith: 'http',
+    }
   } finally {
     clearTimeout(timeout)
   }
@@ -145,19 +151,35 @@ async function fetchHtmlWithBrowser(url, { language, timeoutMs }) {
     const page = await context.newPage()
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs })
     await page.waitForTimeout(1500)
-    return page.content()
+    const html = await page.content()
+    let title = null
+    try {
+      title = await page.title()
+    } catch {
+      title = null
+    }
+
+    return {
+      html,
+      finalUrl: page.url(),
+      title,
+      fetchedWith: 'browser',
+    }
   } finally {
     await browser.close()
   }
 }
 
-export async function fetchHtml(url, { language = 'en-US,en;q=0.9', timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
-  const mode = FETCH_MODE
+export async function fetchHtmlDocument(
+  url,
+  { language = 'en-US,en;q=0.9', timeoutMs = DEFAULT_TIMEOUT_MS, mode = FETCH_MODE } = {},
+) {
+  const normalizedMode = String(mode || FETCH_MODE).toLowerCase()
 
-  if (mode === 'http-only') {
+  if (normalizedMode === 'http-only') {
     return fetchHtmlWithHttp(url, { language, timeoutMs })
   }
-  if (mode === 'browser-only') {
+  if (normalizedMode === 'browser-only') {
     return fetchHtmlWithBrowser(url, { language, timeoutMs })
   }
 
@@ -172,4 +194,9 @@ export async function fetchHtml(url, { language = 'en-US,en;q=0.9', timeoutMs = 
       throw new Error(`browser+http failed: browser=${browserMessage}; http=${httpMessage}`)
     }
   }
+}
+
+export async function fetchHtml(url, options = {}) {
+  const doc = await fetchHtmlDocument(url, options)
+  return doc.html
 }

@@ -2,16 +2,33 @@
 
 import { useMemo, useState } from 'react'
 
+const CLICK_API_BASE_URL = process.env.NEXT_PUBLIC_CLICK_API_BASE_URL?.replace(/\/$/, '')
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '')
+const WORKER_API_BASE_URL = process.env.NEXT_PUBLIC_WORKER_API_BASE_URL?.replace(/\/$/, '')
+
+function getClickEndpoint() {
+  const apiBase = API_BASE_URL || WORKER_API_BASE_URL || CLICK_API_BASE_URL
+  if (apiBase) {
+    return `${apiBase}/click`
+  }
+  return '/api/click'
+}
+
 async function trackClick(productId) {
-  await fetch('/api/click', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      productId,
-      referrer: document.referrer || null,
-      sessionId: crypto.randomUUID(),
-    }),
-  })
+  try {
+    await fetch(getClickEndpoint(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        productId,
+        referrer: document.referrer || null,
+        sessionId: crypto.randomUUID(),
+      }),
+      keepalive: true,
+    })
+  } catch (error) {
+    console.error('failed to track click event', error)
+  }
 }
 
 function formatMoney(value) {
@@ -109,7 +126,7 @@ export default function ProductDashboard({ products, historiesById }) {
           >
             제휴 링크로 구매하기
           </a>
-          <p>클릭 시 `click_events` 테이블에 이벤트가 저장됩니다.</p>
+          <p>클릭 시 API를 통해 `click_events` 테이블에 이벤트를 저장합니다.</p>
         </div>
       </section>
     </main>
