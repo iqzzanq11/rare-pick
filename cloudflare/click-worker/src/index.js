@@ -1,3 +1,6 @@
+import { getSupportedSourcesErrorText, isSupportedSource } from '../../../lib/market-registry.js'
+import { parseProductUrl } from '../../../lib/url-parser.js'
+
 function corsHeaders(origin) {
   return {
     'Access-Control-Allow-Origin': origin,
@@ -108,12 +111,6 @@ export default {
       return json({ ok: true }, 200, headers)
     }
 
-    if (!['amazon', 'coupang'].includes(body?.source)) {
-      return json({ error: 'source must be amazon or coupang' }, 400, headers)
-    }
-    if (!body?.externalId || typeof body.externalId !== 'string') {
-      return json({ error: 'externalId is required' }, 400, headers)
-    }
     if (!body?.productUrl || typeof body.productUrl !== 'string') {
       return json({ error: 'productUrl is required' }, 400, headers)
     }
@@ -130,6 +127,28 @@ export default {
       return json({ error: 'targetPrice must be a number' }, 400, headers)
     }
 
+    let parsed
+    try {
+      parsed = parseProductUrl(body.productUrl)
+    } catch (error) {
+      return json(
+        { error: error instanceof Error ? error.message : 'failed to parse productUrl' },
+        400,
+        headers,
+      )
+    }
+
+    const source = body?.source && isSupportedSource(body.source) ? body.source : parsed.source
+    const externalId =
+      typeof body?.externalId === 'string' && body.externalId.trim() ? body.externalId.trim() : parsed.externalId
+
+    if (!isSupportedSource(source)) {
+      return json({ error: getSupportedSourcesErrorText() }, 400, headers)
+    }
+    if (!externalId) {
+      return json({ error: 'externalId is required' }, 400, headers)
+    }
+
     const insertResponse = await fetch(`${env.SUPABASE_URL}/rest/v1/watch_jobs`, {
       method: 'POST',
       headers: {
@@ -139,9 +158,9 @@ export default {
         Prefer: 'return=representation',
       },
       body: JSON.stringify({
-        source: body.source,
-        external_id: body.externalId,
-        product_url: body.productUrl,
+        source,
+        external_id: externalId,
+        product_url: parsed.canonicalUrl,
         target_price: targetPrice,
         notify_email: body?.notifyEmail ?? null,
         is_active: true,

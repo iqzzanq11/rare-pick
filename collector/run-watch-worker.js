@@ -1,4 +1,4 @@
-import { fetchAmazonPrice } from './fetchers/amazon-paapi.js'
+import { getFetcherBySource } from './fetchers/fetcher-registry.js'
 import { getUsdKrwRate } from './fx-rate.js'
 import {
   createNotificationEvent,
@@ -36,13 +36,8 @@ function toFetchItem(watch) {
 
 async function fetchCurrentPrice(watch) {
   const item = toFetchItem(watch)
-  if (watch.source === 'amazon') {
-    return fetchAmazonPrice(item)
-  }
-  if (watch.source === 'coupang') {
-    throw new Error('coupang fetch is temporarily paused')
-  }
-  throw new Error(`unsupported source: ${watch.source}`)
+  const fetcher = getFetcherBySource(watch.source)
+  return fetcher(item)
 }
 
 function evaluateHit({ watch, previousMinPrice, latestPrice, latestPriceKrw }) {

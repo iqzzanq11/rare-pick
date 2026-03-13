@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { getMarketLabel, getSupportedMarketsText } from '../lib/market-registry.js'
 
 const CLICK_API_BASE_URL = process.env.NEXT_PUBLIC_CLICK_API_BASE_URL?.replace(/\/$/, '')
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '')
@@ -41,6 +42,17 @@ export default function ProductDashboard({ products, historiesById }) {
     () => products.find((product) => product.id === selectedId) ?? products[0],
     [products, selectedId],
   )
+  if (!selectedProduct) {
+    return (
+      <main className="app">
+        <header className="hero">
+          <p className="eyebrow">Rare Pick MVP</p>
+          <h1>멀티 마켓 가격 추적 대시보드</h1>
+          <p>지원 마켓: {getSupportedMarketsText()}</p>
+        </header>
+      </main>
+    )
+  }
   const points = historiesById[selectedProduct.id] ?? []
   const prices = points.map((point) => Number(point.price))
   const minPrice = prices.length ? Math.min(...prices) : 0
@@ -59,8 +71,9 @@ export default function ProductDashboard({ products, historiesById }) {
     <main className="app">
       <header className="hero">
         <p className="eyebrow">Rare Pick MVP</p>
-        <h1>쿠팡/아마존 가격 비교 추적 대시보드</h1>
+        <h1>멀티 마켓 가격 비교 추적 대시보드</h1>
         <p>API 기반 가격 히스토리와 클릭 로그 저장이 연결된 Next.js 앱입니다.</p>
+        <p>지원 마켓: {getSupportedMarketsText()}</p>
       </header>
 
       <section className="product-list">
@@ -71,7 +84,7 @@ export default function ProductDashboard({ products, historiesById }) {
             className={`product-card ${selectedId === product.id ? 'active' : ''}`}
             onClick={() => setSelectedId(product.id)}
           >
-            <p className="source">{product.source}</p>
+            <p className="source">{getMarketLabel(product.source)}</p>
             <h2>{product.title}</h2>
             <p>{product.category}</p>
           </button>
