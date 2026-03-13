@@ -26,11 +26,22 @@ function convertToKrw(price, currency, usdKrwRate) {
 }
 
 function toFetchItem(watch) {
+  let affiliateUrl = watch.productUrl
+  if (watch.source === 'amazon') {
+    try {
+      const parsed = new URL(watch.productUrl)
+      const host = parsed.hostname.toLowerCase().includes('amazon.') ? parsed.hostname.toLowerCase() : 'www.amazon.com'
+      affiliateUrl = `https://${host}/dp/${watch.externalId}`
+    } catch {
+      affiliateUrl = `https://www.amazon.com/dp/${watch.externalId}`
+    }
+  }
+
   return {
     source: watch.source,
     externalId: watch.externalId,
     title: `[${watch.source}] ${watch.externalId}`,
-    affiliateUrl: watch.productUrl,
+    affiliateUrl,
   }
 }
 
