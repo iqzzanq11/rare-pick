@@ -1,4 +1,5 @@
 import { extractByRegexList, extractJsonLdPrice, fetchHtmlDocument } from './html-price.js'
+import { isPlaceholderTitle } from '../../lib/market-registry.js'
 
 function normalizeNumber(raw) {
   if (typeof raw !== 'string') {
@@ -67,10 +68,6 @@ function normalizeTitle(value) {
     return null
   }
   return stripped.replace(/\s*[:\-|]\s*amazon.*$/i, '').trim() || null
-}
-
-function isPlaceholderTitle(value) {
-  return /^\[(amazon|coupang)\]\s+[A-Z0-9]+$/i.test(String(value || '').trim())
 }
 
 function parseJsonLdObjects(html) {

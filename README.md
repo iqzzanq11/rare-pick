@@ -1,6 +1,6 @@
 # Rare Pick MVP
 
-쿠팡/아마존 상품 URL 등록 기반의 가격 추적 + 최저가 알림 MVP입니다.
+아마존/쿠팡/11번가/G마켓 상품 URL 등록 기반의 가격 추적 + 최저가 알림 MVP입니다.
 
 ## 포함된 것
 
@@ -97,8 +97,8 @@ npx playwright install chromium
 
 ## 실제 API 연동 방식
 
-- Amazon/Coupang 상품 URL HTML을 직접 요청해 가격을 파싱합니다.
-  - 파일: `collector/fetchers/amazon-paapi.js`, `collector/fetchers/coupang-openapi.js`
+- Amazon/Coupang/11번가/G마켓 상품 URL HTML을 직접 요청해 가격을 파싱합니다.
+  - 파일: `collector/fetchers/amazon-paapi.js`, `collector/fetchers/coupang-openapi.js`, `collector/fetchers/11st-html.js`, `collector/fetchers/gmarket-html.js`
   - 공통 유틸: `collector/fetchers/html-price.js`
 - 파싱/요청 실패 시 해당 watch는 `last_error`에 실패 원인이 기록됩니다.
 - 알림은 `NOTIFY_WEBHOOK_URL`이 설정된 경우 웹훅으로 발송됩니다.
