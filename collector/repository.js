@@ -1,11 +1,9 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import pg from 'pg'
-import { getSupportedSourcePattern } from '../lib/market-registry.js'
 
 const { Pool } = pg
 let pool
-const SOURCE_PATTERN = getSupportedSourcePattern()
 
 function getPool() {
   if (!process.env.DATABASE_URL) {
@@ -53,7 +51,7 @@ export async function insertSnapshotsToDb(snapshots) {
           ON CONFLICT (source, external_id)
           DO UPDATE SET
             title = CASE
-              WHEN EXCLUDED.title ~ '^\\[(${SOURCE_PATTERN})\\]\\s+[A-Za-z0-9_-]+' THEN products.title
+              WHEN EXCLUDED.title ~ '^\\[(amazon|coupang)\\]\\s+[A-Za-z0-9]+' THEN products.title
               ELSE EXCLUDED.title
             END,
             image_url = COALESCE(EXCLUDED.image_url, products.image_url),
@@ -147,7 +145,7 @@ export async function saveSnapshotForWatch({ watchJob, snapshot, errorMessage = 
         ON CONFLICT (source, external_id)
         DO UPDATE SET
           title = CASE
-            WHEN EXCLUDED.title ~ '^\\[(${SOURCE_PATTERN})\\]\\s+[A-Za-z0-9_-]+' THEN products.title
+            WHEN EXCLUDED.title ~ '^\\[(amazon|coupang)\\]\\s+[A-Za-z0-9]+' THEN products.title
             ELSE EXCLUDED.title
           END,
           image_url = COALESCE(EXCLUDED.image_url, products.image_url),

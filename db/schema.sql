@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS products (
   id BIGSERIAL PRIMARY KEY,
-  source VARCHAR(20) NOT NULL CHECK (source IN ('amazon', 'coupang', '11st', 'gmarket')),
+  source VARCHAR(20) NOT NULL CHECK (source IN ('amazon', 'coupang')),
   external_id VARCHAR(120) NOT NULL,
   title TEXT NOT NULL,
   image_url TEXT,
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS click_events (
 
 CREATE TABLE IF NOT EXISTS affiliate_reports (
   id BIGSERIAL PRIMARY KEY,
-  source VARCHAR(20) NOT NULL CHECK (source IN ('amazon', 'coupang', '11st', 'gmarket')),
+  source VARCHAR(20) NOT NULL CHECK (source IN ('amazon', 'coupang')),
   report_date DATE NOT NULL,
   clicks INTEGER NOT NULL DEFAULT 0,
   orders INTEGER NOT NULL DEFAULT 0,
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS affiliate_reports (
 CREATE TABLE IF NOT EXISTS watch_jobs (
   id BIGSERIAL PRIMARY KEY,
   product_id BIGINT REFERENCES products(id) ON DELETE SET NULL,
-  source VARCHAR(20) NOT NULL CHECK (source IN ('amazon', 'coupang', '11st', 'gmarket')),
+  source VARCHAR(20) NOT NULL CHECK (source IN ('amazon', 'coupang')),
   external_id VARCHAR(120) NOT NULL,
   product_url TEXT NOT NULL,
   target_price NUMERIC(12, 2),

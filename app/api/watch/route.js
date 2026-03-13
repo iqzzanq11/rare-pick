@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { hasDatabase } from '../../../lib/db'
-import { createWatchJob, listWatchJobs } from '../../../lib/watch-service'
+import { createWatchJob } from '../../../lib/watch-service'
 
 function isValidEmail(value) {
   if (!value) {
@@ -40,20 +40,6 @@ export async function POST(request) {
     })
 
     return NextResponse.json({ ok: true, watch })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'unexpected error'
-    return NextResponse.json({ error: message }, { status: 500 })
-  }
-}
-
-export async function GET() {
-  try {
-    if (!hasDatabase()) {
-      return NextResponse.json({ watches: [] })
-    }
-
-    const watches = await listWatchJobs()
-    return NextResponse.json({ watches })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'unexpected error'
     return NextResponse.json({ error: message }, { status: 500 })

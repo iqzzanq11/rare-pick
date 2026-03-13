@@ -1,10 +1,16 @@
 import { getConfig } from './config.js'
-import { getFetcherBySource } from './fetchers/fetcher-registry.js'
+import { fetchAmazonPrice } from './fetchers/amazon-paapi.js'
+import { fetchCoupangPrice } from './fetchers/coupang-openapi.js'
 import { appendSnapshots, insertSnapshotsToDb } from './repository.js'
 
 async function fetchOne(item) {
-  const fetcher = getFetcherBySource(item.source)
-  return fetcher(item)
+  if (item.source === 'amazon') {
+    return fetchAmazonPrice(item)
+  }
+  if (item.source === 'coupang') {
+    return fetchCoupangPrice(item)
+  }
+  throw new Error(`unsupported source: ${item.source}`)
 }
 
 async function run() {

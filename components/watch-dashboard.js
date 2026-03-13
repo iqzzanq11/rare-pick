@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getMarketLabel, getPlaceholderTitle, getSupportedMarketsText } from '../lib/market-registry.js'
 import { parseProductUrl } from '../lib/url-parser'
 
 const STORAGE_KEY = 'rare-pick-watches-v1'
@@ -17,37 +16,11 @@ function getWatchEndpoint() {
   return '/api/watch'
 }
 
-function formatMoney(value, currency = 'KRW') {
+function formatMoney(value) {
   if (value === null || value === undefined) {
     return '-'
   }
-  const amount = Number(value)
-  if (!Number.isFinite(amount)) {
-    return '-'
-  }
-
-  if (String(currency || '').toUpperCase() === 'USD') {
-    return `$${amount.toLocaleString('en-US')}`
-  }
-
-  return `₩${amount.toLocaleString('ko-KR')}`
-}
-
-function getWatchKey(watch) {
-  return `${watch.source}:${watch.externalId}:${watch.productUrl}`
-}
-
-function mergeWatches(primaryWatches, secondaryWatches) {
-  const merged = new Map()
-
-  for (const watch of secondaryWatches) {
-    merged.set(getWatchKey(watch), watch)
-  }
-  for (const watch of primaryWatches) {
-    merged.set(getWatchKey(watch), watch)
-  }
-
-  return Array.from(merged.values())
+  return `₩${Number(value).toLocaleString('ko-KR')}`
 }
 
 export default function WatchDashboard({ initialWatches, dbError }) {
@@ -66,7 +39,7 @@ export default function WatchDashboard({ initialWatches, dbError }) {
       }
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed)) {
-        setWatches((previousWatches) => mergeWatches(previousWatches, parsed))
+        setWatches(parsed)
       }
     } catch {
       localStorage.removeItem(STORAGE_KEY)
@@ -122,14 +95,13 @@ export default function WatchDashboard({ initialWatches, dbError }) {
         id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`,
         source: parsed.source,
         externalId: parsed.externalId,
-        title: getPlaceholderTitle(parsed.source, parsed.externalId),
+        title: `[${parsed.source}] ${parsed.externalId}`,
         productUrl: parsed.canonicalUrl,
         targetPrice: normalizedTargetPrice,
         notifyEmail: notifyEmail || null,
         isActive: true,
         lastCheckedAt: null,
         lastPrice: null,
-        lastPriceCurrency: parsed.source === 'amazon' ? 'USD' : 'KRW',
         lowestPrice: 0,
         lastError: null,
         createdAt: nowIso,
@@ -148,15 +120,14 @@ export default function WatchDashboard({ initialWatches, dbError }) {
             id: String(inserted.id),
             source: inserted.source,
             externalId: inserted.externalId,
-            title: inserted.title || getPlaceholderTitle(inserted.source, inserted.externalId),
+            title: `[${inserted.source}] ${inserted.externalId}`,
             productUrl: inserted.productUrl,
             targetPrice: inserted.targetPrice,
             notifyEmail: inserted.notifyEmail,
             isActive: inserted.isActive,
             lastCheckedAt: inserted.lastCheckedAt,
             lastPrice: inserted.lastPrice,
-            lastPriceCurrency: inserted.lastPriceCurrency || (inserted.source === 'amazon' ? 'USD' : 'KRW'),
-            lowestPrice: inserted.lowestPrice ?? 0,
+            lowestPrice: 0,
             lastError: inserted.lastError,
             createdAt: inserted.createdAt,
           },
@@ -185,7 +156,6 @@ export default function WatchDashboard({ initialWatches, dbError }) {
           API가 연결되면 등록 데이터는 DB에 저장되고, 미연결 상태에서는 브라우저 로컬 저장소에
           저장됩니다.
         </p>
-        <p>지원 마켓: {getSupportedMarketsText()}</p>
         {dbError ? <p className="error">DB 연결 오류: {dbError}</p> : null}
       </header>
 
@@ -197,7 +167,7 @@ export default function WatchDashboard({ initialWatches, dbError }) {
             <input
               required
               type="url"
-              placeholder="Amazon / Coupang / 11번가 / G마켓 상품 URL"
+              placeholder="https://www.amazon.com/dp/ASIN"
               value={productUrl}
               onChange={(event) => setProductUrl(event.target.value)}
             />
@@ -241,10 +211,10 @@ export default function WatchDashboard({ initialWatches, dbError }) {
                   <strong>{watch.title ?? `${watch.source}:${watch.externalId}`}</strong>
                 </p>
                 <p>
-                  소스: {getMarketLabel(watch.source)} / ID: {watch.externalId}
+                  소스: {watch.source} / ID: {watch.externalId}
                 </p>
-                <p>현재가: {formatMoney(watch.lastPrice, watch.lastPriceCurrency)}</p>
-                <p>최저가: {formatMoney(watch.lowestPrice, watch.lastPriceCurrency)}</p>
+                <p>현재 수집가: {formatMoney(watch.lastPrice)}</p>
+                <p>최저가: {formatMoney(watch.lowestPrice)}</p>
                 <p>목표가: {formatMoney(watch.targetPrice)}</p>
                 <p>최근 체크: {watch.lastCheckedAt ?? '-'}</p>
                 <p>오류: {watch.lastError ?? '-'}</p>

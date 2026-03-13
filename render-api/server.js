@@ -1,7 +1,5 @@
 import http from 'node:http'
 import pg from 'pg'
-import { getSupportedSourcesErrorText, isSupportedSource } from '../lib/market-registry.js'
-import { parseProductUrl } from '../lib/url-parser.js'
 
 const { Pool } = pg
 
@@ -96,6 +94,12 @@ async function handleClick(body) {
 }
 
 async function handleWatch(body) {
+  if (!['amazon', 'coupang'].includes(body?.source)) {
+    return { status: 400, body: { error: 'source must be amazon or coupang' } }
+  }
+  if (!body?.externalId || typeof body.externalId !== 'string') {
+    return { status: 400, body: { error: 'externalId is required' } }
+  }
   if (!body?.productUrl || typeof body.productUrl !== 'string') {
     return { status: 400, body: { error: 'productUrl is required' } }
   }
@@ -112,29 +116,6 @@ async function handleWatch(body) {
     return { status: 400, body: { error: 'targetPrice must be a number' } }
   }
 
-  let parsed
-  try {
-    parsed = parseProductUrl(body.productUrl)
-  } catch (error) {
-    return {
-      status: 400,
-      body: {
-        error: error instanceof Error ? error.message : 'failed to parse productUrl',
-      },
-    }
-  }
-
-  const source = body?.source && isSupportedSource(body.source) ? body.source : parsed.source
-  const externalId =
-    typeof body?.externalId === 'string' && body.externalId.trim() ? body.externalId.trim() : parsed.externalId
-
-  if (!isSupportedSource(source)) {
-    return { status: 400, body: { error: getSupportedSourcesErrorText() } }
-  }
-  if (!externalId) {
-    return { status: 400, body: { error: 'externalId is required' } }
-  }
-
   const result = await getPool().query(
     `
       INSERT INTO watch_jobs (source, external_id, product_url, target_price, notify_email, is_active)
@@ -142,7 +123,7 @@ async function handleWatch(body) {
       RETURNING id, source, external_id, product_url, target_price, notify_email,
         is_active, last_checked_at, last_price, last_error, created_at
     `,
-    [source, externalId, parsed.canonicalUrl, targetPrice, body?.notifyEmail ?? null],
+    [body.source, body.externalId, body.productUrl, targetPrice, body?.notifyEmail ?? null],
   )
 
   const row = result.rows[0]

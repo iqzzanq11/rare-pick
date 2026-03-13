@@ -51,23 +51,6 @@ function extractCoupangHtmlPrice(html) {
   return null
 }
 
-function extractCoupangMetadata(html, fallbackTitle) {
-  const title =
-    html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1]?.trim() ||
-    html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<[^>]+>/g, ' ').trim() ||
-    fallbackTitle ||
-    null
-
-  const imageUrl =
-    html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1]?.trim() || null
-
-  return {
-    title: title ? title.replace(/\s*[-|:]\s*(쿠팡|coupang).*$/i, '').trim() : null,
-    imageUrl,
-    category: null,
-  }
-}
-
 export async function fetchCoupangPrice(item) {
   if (!item?.affiliateUrl) {
     throw new Error('coupang item.affiliateUrl is required')
@@ -75,7 +58,6 @@ export async function fetchCoupangPrice(item) {
 
   const doc = await fetchHtmlDocument(item.affiliateUrl, { language: 'ko-KR,ko;q=0.9,en-US;q=0.8' })
   let price = extractCoupangHtmlPrice(doc.html)
-  let metadata = extractCoupangMetadata(doc.html, doc.title)
 
   if (price === null && (detectBlockedPage(doc) || !looksLikeProductPage(doc))) {
     const httpDoc = await fetchHtmlDocument(item.affiliateUrl, {
@@ -85,7 +67,6 @@ export async function fetchCoupangPrice(item) {
     const retriedPrice = extractCoupangHtmlPrice(httpDoc.html)
     if (retriedPrice !== null) {
       price = retriedPrice
-      metadata = extractCoupangMetadata(httpDoc.html, httpDoc.title)
     } else if (detectBlockedPage(httpDoc)) {
       throw new Error(
         `coupang blocked/anti-bot page detected (browser finalUrl=${doc.finalUrl || 'unknown'}, browser title=${doc.title || 'unknown'}, http finalUrl=${httpDoc.finalUrl || 'unknown'})`,
@@ -106,9 +87,7 @@ export async function fetchCoupangPrice(item) {
   return {
     source: 'coupang',
     externalId: item.externalId,
-    title: metadata.title || item.title,
-    imageUrl: metadata.imageUrl,
-    category: metadata.category,
+    title: item.title,
     affiliateUrl: item.affiliateUrl,
     currency: 'KRW',
     price,
